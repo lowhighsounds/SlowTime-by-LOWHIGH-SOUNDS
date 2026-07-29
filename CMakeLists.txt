@@ -1,8 +1,16 @@
 cmake_minimum_required(VERSION 3.24)
-project(SlowTime VERSION 0.1.0 LANGUAGES CXX)
+project(SlowTime VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# macOS: JUCE's Apple backends are Objective-C / Objective-C++ (.m/.mm), which
+# need these languages enabled (they exist only on Apple toolchains, hence the
+# guard). Without them the generate step fails with a missing CMAKE_C_COMPILE_OBJECT.
+if(APPLE)
+    enable_language(OBJC)
+    enable_language(OBJCXX)
+endif()
 
 # Static MSVC runtime for EVERY target (JUCE modules, signalsmith, the plugin)
 # so the shipped VST3 loads on machines without Visual Studio / the VC++
