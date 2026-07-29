@@ -21,9 +21,7 @@ jobs:
       - name: Build VST3 + CLAP (Release)
         run: cmake --build build --target SlowTime_VST3 SlowTime_CLAP --config Release
 
-      - name: Generate installer branding assets
-        shell: powershell   # Windows PowerShell 5.1 (System.Drawing available)
-        run: .\installer\make-assets.ps1
+      # Branding assets (installer/assets/*) are committed, so no generation step.
 
       - name: Install Inno Setup
         run: choco install innosetup -y --no-progress
@@ -76,7 +74,7 @@ jobs:
           mkdir -p installer/output
           pkgbuild --root "$ROOT" \
                    --identifier com.lowhighsounds.slowtime \
-                   --version 0.1.0 \
+                   --version 0.1.1 \
                    --install-location / \
                    installer/output/SlowTime-Installer-macOS.pkg
 
