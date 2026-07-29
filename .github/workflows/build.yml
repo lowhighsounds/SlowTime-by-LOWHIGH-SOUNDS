@@ -1,0 +1,97 @@
+name: Build installers
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  # ------------------------------------------------------------------ Windows
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure (Release)
+        run: cmake -S . -B build
+
+      - name: Build VST3 (Release)
+        run: cmake --build build --target SlowTime_VST3 --config Release
+
+      - name: Generate installer branding assets
+        shell: powershell   # Windows PowerShell 5.1 (System.Drawing available)
+        run: .\installer\make-assets.ps1
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Compile installer
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\SlowTime.iss'
+
+      # --- Optional Windows code signing (enable later with a cert) -----------
+      # - name: Sign installer
+      #   if: ${{ env.WINDOWS_CERT_CONFIGURED == 'true' }}
+      #   run: signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 installer\output\SlowTime-Installer-Windows.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SlowTime-Installer-Windows
+          path: installer/output/SlowTime-Installer-Windows.exe
+          if-no-files-found: error
+
+  # -------------------------------------------------------------------- macOS
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure (Release, universal)
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Build VST3 (Release)
+        run: cmake --build build --target SlowTime_VST3
+
+      # --- Optional macOS code signing + notarization (enable later) ----------
+      # Requires secrets: APPLE_DEV_ID_APP, APPLE_TEAM_ID, etc. Skipped for now.
+
+      - name: Package .pkg
+        run: |
+          set -e
+          VST3=$(find build -name "SlowTime.vst3" -type d | head -1)
+          echo "Found VST3 at: $VST3"
+          mkdir -p pkgroot/Library/Audio/Plug-Ins/VST3
+          cp -R "$VST3" pkgroot/Library/Audio/Plug-Ins/VST3/
+          mkdir -p installer/output
+          pkgbuild --root pkgroot \
+                   --identifier com.lowhighsounds.slowtime \
+                   --version 0.1.0 \
+                   --install-location / \
+                   installer/output/SlowTime-Installer-macOS.pkg
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SlowTime-Installer-macOS
+          path: installer/output/SlowTime-Installer-macOS.pkg
+          if-no-files-found: error
+
+  # ------------------------------------------------ Release (only on v* tags)
+  release:
+    needs: [ windows, macos ]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          generate_release_notes: true
