@@ -19,9 +19,18 @@ add_subdirectory(libs/JUCE)
 # FetchContent's its signalsmith-linear dependency automatically).
 add_subdirectory(libs/signalsmith-stretch)
 
-# Distribution builds VST3 only (the format every target DAW loads). To also
-# support Logic Pro on macOS, add AU here: e.g. set(SLOWTIME_FORMATS VST3 AU).
-set(SLOWTIME_FORMATS VST3)
+# CLAP support via the open-source clap-juce-extensions wrapper (adds a
+# SlowTime_CLAP target from the same shared code). MIT/BSD, no fees.
+add_subdirectory(libs/clap-juce-extensions EXCLUDE_FROM_ALL)
+
+# Free formats for the widest DAW coverage: VST3 everywhere; AU on macOS so
+# Logic Pro / GarageBand load it. CLAP is added separately below (not a JUCE
+# FORMATS keyword). Pro Tools (AAX) is intentionally excluded (Avid/PACE-gated).
+if(APPLE)
+    set(SLOWTIME_FORMATS VST3 AU)
+else()
+    set(SLOWTIME_FORMATS VST3)
+endif()
 
 juce_add_plugin(SlowTime
     COMPANY_NAME "LowHigh Sounds"
@@ -75,3 +84,8 @@ target_link_libraries(SlowTime PRIVATE
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
+
+# Emit a CLAP build (SlowTime_CLAP -> SlowTime.clap) from the shared code.
+clap_juce_extensions_plugin(TARGET SlowTime
+    CLAP_ID "com.lowhighsounds.slowtime"
+    CLAP_FEATURES audio-effect pitch-shifter)
