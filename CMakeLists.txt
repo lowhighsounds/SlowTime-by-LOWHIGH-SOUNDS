@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(SlowTime VERSION 0.1.2 LANGUAGES C CXX)
+project(SlowTime VERSION 0.1.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,13 +27,9 @@ add_subdirectory(libs/JUCE)
 # FetchContent's its signalsmith-linear dependency automatically).
 add_subdirectory(libs/signalsmith-stretch)
 
-# CLAP support via the open-source clap-juce-extensions wrapper (adds a
-# SlowTime_CLAP target from the same shared code). MIT/BSD, no fees.
-add_subdirectory(libs/clap-juce-extensions EXCLUDE_FROM_ALL)
-
-# Free formats for the widest DAW coverage: VST3 everywhere; AU on macOS so
-# Logic Pro / GarageBand load it. CLAP is added separately below (not a JUCE
-# FORMATS keyword). Pro Tools (AAX) is intentionally excluded (Avid/PACE-gated).
+# Formats: VST3 everywhere; AU on macOS so Logic Pro / GarageBand load it.
+# (CLAP was dropped -- its host-side latency handling caused glitches; VST3 is
+# the priority format.) Pro Tools (AAX) is intentionally excluded (Avid-gated).
 if(APPLE)
     set(SLOWTIME_FORMATS VST3 AU)
 else()
@@ -92,8 +88,3 @@ target_link_libraries(SlowTime PRIVATE
     juce::juce_recommended_config_flags
     juce::juce_recommended_lto_flags
     juce::juce_recommended_warning_flags)
-
-# Emit a CLAP build (SlowTime_CLAP -> SlowTime.clap) from the shared code.
-clap_juce_extensions_plugin(TARGET SlowTime
-    CLAP_ID "com.lowhighsounds.slowtime"
-    CLAP_FEATURES audio-effect pitch-shifter)

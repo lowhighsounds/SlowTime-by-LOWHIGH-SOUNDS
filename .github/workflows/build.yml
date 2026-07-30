@@ -18,8 +18,8 @@ jobs:
       - name: Configure (Release)
         run: cmake -S . -B build
 
-      - name: Build VST3 + CLAP (Release)
-        run: cmake --build build --target SlowTime_VST3 SlowTime_CLAP --config Release
+      - name: Build VST3 (Release)
+        run: cmake --build build --target SlowTime_VST3 --config Release
 
       # Branding assets (installer/assets/*) are committed, so no generation step.
 
@@ -51,30 +51,27 @@ jobs:
       - name: Configure (Release, universal)
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
 
-      - name: Build VST3 + AU + CLAP (Release)
-        run: cmake --build build --target SlowTime_VST3 SlowTime_AU SlowTime_CLAP
+      - name: Build VST3 + AU (Release)
+        run: cmake --build build --target SlowTime_VST3 SlowTime_AU
 
       # --- Optional macOS code signing + notarization (enable later) ----------
       # Requires secrets: APPLE_DEV_ID_APP, APPLE_TEAM_ID, etc. Skipped for now.
 
-      - name: Package .pkg (VST3 + AU + CLAP)
+      - name: Package .pkg (VST3 + AU)
         run: |
           set -e
           ROOT=pkgroot
           mkdir -p "$ROOT/Library/Audio/Plug-Ins/VST3" \
-                   "$ROOT/Library/Audio/Plug-Ins/Components" \
-                   "$ROOT/Library/Audio/Plug-Ins/CLAP"
+                   "$ROOT/Library/Audio/Plug-Ins/Components"
           VST3=$(find build -name "SlowTime.vst3" -type d | head -1)
           AU=$(find build -name "SlowTime.component" -type d | head -1)
-          CLAP=$(find build -name "SlowTime.clap" | head -1)
-          echo "VST3=$VST3"; echo "AU=$AU"; echo "CLAP=$CLAP"
+          echo "VST3=$VST3"; echo "AU=$AU"
           cp -R "$VST3" "$ROOT/Library/Audio/Plug-Ins/VST3/"
           cp -R "$AU"   "$ROOT/Library/Audio/Plug-Ins/Components/"
-          cp -R "$CLAP" "$ROOT/Library/Audio/Plug-Ins/CLAP/"
           mkdir -p installer/output
           pkgbuild --root "$ROOT" \
                    --identifier com.lowhighsounds.slowtime \
-                   --version 0.1.2 \
+                   --version 0.1.3 \
                    --install-location / \
                    installer/output/SlowTime-Installer-macOS.pkg
 
