@@ -18,12 +18,11 @@ Download the installer for your OS from the
 or grab the build artifacts from the **Actions** tab. Step-by-step (PT-BR) in
 [INSTALL.md](INSTALL.md).
 
-- **Windows:** `SlowTime-Installer-Windows.exe` — installs **VST3** and/or **CLAP** (pick in the installer).
-- **macOS:** `SlowTime-Installer-macOS.pkg` — installs **VST3 + AU + CLAP**.
+- **Windows:** `SlowTime-Installer-Windows.exe` — installs the **VST3**.
+- **macOS:** `SlowTime-Installer-macOS.pkg` — installs **VST3 + AU**.
 
-Formats: **VST3**, **CLAP** (Windows & macOS) and **AU** (macOS). Works in FL Studio, Ableton Live,
+Formats: **VST3** (Windows & macOS) and **AU** (macOS). Works in FL Studio, Ableton Live,
 Studio One, Cubase, Reaper, Bitwig, Waveform — and **Logic Pro / GarageBand** (via AU on Mac).
-CLAP covers Bitwig, Reaper, FL Studio 2024+, Studio One 6.5+, Cubase 14+.
 (Pro Tools is **not** supported — it only loads AAX, which is Avid/PACE-gated.)
 
 > These test builds are **not code-signed**, so Windows SmartScreen / macOS Gatekeeper will
@@ -35,8 +34,8 @@ CLAP covers Bitwig, Reaper, FL Studio 2024+, Studio One 6.5+, Cubase 14+.
 git clone --recurse-submodules https://github.com/lowhighsounds/SlowTime-by-LOWHIGH-SOUNDS.git
 cd SlowTime-by-LOWHIGH-SOUNDS
 cmake -S . -B build
-# Windows: VST3 + CLAP. macOS also builds AU (SlowTime_AU).
-cmake --build build --target SlowTime_VST3 SlowTime_CLAP --config Release
+# Windows: VST3. macOS also builds AU (SlowTime_AU).
+cmake --build build --target SlowTime_VST3 --config Release
 ```
 
 Installers are produced automatically by GitHub Actions (`.github/workflows/build.yml`) for

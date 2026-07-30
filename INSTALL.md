@@ -1,6 +1,6 @@
 # Instalar o SlowTime (guia rápido)
 
-Obrigado por testar o **SlowTime** da **LowHigh Sounds**! Formatos: **VST3** e **CLAP**
+Obrigado por testar o **SlowTime** da **LowHigh Sounds**! Formatos: **VST3**
 (Windows e Mac) e também **AU** (Mac, pro Logic/GarageBand).
 Estas versões de teste ainda **não são assinadas**, então o sistema mostra um aviso de
 "desenvolvedor desconhecido" — é normal, é só passar por ele (explicado abaixo).
@@ -10,9 +10,9 @@ Estas versões de teste ainda **não são assinadas**, então o sistema mostra u
 1. Baixe o **`SlowTime-Installer-Windows.exe`**.
 2. Ao abrir, o Windows pode mostrar uma tela azul do **SmartScreen** ("O Windows protegeu seu PC").
    Clique em **"Mais informações" → "Executar assim mesmo"**.
-3. No instalador, escolha os **formatos** que quer (VST3 e/ou CLAP) — cada um vai automaticamente
-   para a pasta padrão que o DAW já escaneia (`Common Files\VST3` e `Common Files\CLAP`).
-4. Abra seu DAW e, se preciso, mande **reescanear os plugins**. Procure por **SlowTime**
+3. No instalador, escolha **Automatic** (recomendado) — instala o **VST3** na pasta padrão que o
+   DAW já escaneia (`Common Files\VST3`) — ou **Custom**, para escolher a pasta.
+4. Abra seu DAW e, se preciso, mande **reescanear os plugins VST3**. Procure por **SlowTime**
    (fabricante **LowHigh Sounds**).
 
 ## macOS
@@ -26,8 +26,7 @@ Estas versões de teste ainda **não são assinadas**, então o sistema mostra u
 
 ## Onde funciona
 
-- **VST3 / CLAP:** FL Studio, Ableton Live, Studio One, Cubase, Reaper, Bitwig, Waveform, etc.
-  (CLAP cobre Bitwig, Reaper, FL 2024+, Studio One 6.5+, Cubase 14+.)
+- **VST3:** FL Studio, Ableton Live, Studio One, Cubase, Reaper, Bitwig, Waveform, etc.
 - **AU (Mac):** Logic Pro, GarageBand, MainStage.
 - **Pro Tools:** não suportado (só carrega AAX).
 
