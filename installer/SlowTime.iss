@@ -9,7 +9,7 @@
 ; Compile with:  ISCC.exe installer\SlowTime.iss
 
 #define MyAppName "SlowTime"
-#define MyAppVersion "0.1.3"
+#define MyAppVersion "0.1.5"
 #define MyPublisher "LowHigh Sounds"
 #define MyVst3Source "..\build\SlowTime_artefacts\Release\VST3\SlowTime.vst3"
 
