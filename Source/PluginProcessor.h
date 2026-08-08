@@ -98,7 +98,6 @@ private:
     bool lastBlocAEnabled = false;
     bool lastBlocBEnabled = false;
     LoopDivision lastLoopDivision = LoopDivision::Quarter;
-    int lastReportedLatency = -1;
 
     // True once Bloc B has anchored to a real, on-grid boundary and is
     // actively chopping. False right after enabling, after a loop-division
@@ -147,8 +146,6 @@ private:
     int recordCapacity = 0;
     int recordWritePos = 0;
     std::atomic<int> recordedSamples { 0 };
-
-    void updateLatencyReport(bool blocAEnabled);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SlowTimeAudioProcessor)
 };

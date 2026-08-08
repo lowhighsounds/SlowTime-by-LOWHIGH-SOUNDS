@@ -44,6 +44,17 @@ void SlowTimeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBloc
 
     cachedBlocALatencySamples = stretchEngine.getLatencySamples();
 
+    // Report a CONSTANT latency, once, here on the message thread -- never from
+    // processBlock. The plugin always runs delayed by Bloc A's phase-vocoder
+    // latency (the wet path when PITCH is on, a plain delay of the same length
+    // when it's off -- see processBlock), so this figure is always truthful and
+    // the host's PDC keeps every block on the grid. Toggling latency at runtime
+    // (the old behaviour) fired restartComponent(kLatencyChanged) on each PITCH
+    // on/off; Ableton reinitialises on that and, since prepareToPlay reset the
+    // figure, it looped into a permanent mute. Constant latency is what every
+    // phase-vocoder pitch shifter reports, and it fixes that across DAWs.
+    setLatencySamples(cachedBlocALatencySamples);
+
     smoothedPitchSemitones.reset(sampleRate, DspConstants::kParamSmoothingSeconds);
     smoothedPitchSemitones.setCurrentAndTargetValue(0.0f);
 
@@ -95,7 +106,6 @@ void SlowTimeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBloc
 
     lastBlocAEnabled = false;
     lastBlocBEnabled = false;
-    lastReportedLatency = -1;
     lastHostIsPlaying = false;
     expectedNextPpqPosition = -1.0;
     blocBSamplesSinceAnchor = 0;
@@ -109,8 +119,6 @@ void SlowTimeAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBloc
     lastBlocCEnabled = false;
     smoothedBlocCSmooth.reset(sampleRate, DspConstants::kParamSmoothingSeconds);
     smoothedBlocCSmooth.setCurrentAndTargetValue(0.0f);
-
-    updateLatencyReport(false);
 }
 
 void SlowTimeAudioProcessor::releaseResources()
@@ -124,22 +132,6 @@ bool SlowTimeAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) 
     if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
         return false;
     return true;
-}
-
-void SlowTimeAudioProcessor::updateLatencyReport(bool blocAEnabled)
-{
-    // Bloc B (ChopVibeEngine) adds no latency in either direction -- see the
-    // ChopVibeEngine class comment for why that's a deliberate choice (it's
-    // what Deja Vu/HalfTime and the rest of this plugin category do, and two
-    // alternatives that DID add latency were tried and rejected). Only Bloc
-    // A's phase-vocoder engine contributes latency.
-    const int latency = blocAEnabled ? cachedBlocALatencySamples : 0;
-
-    if (latency != lastReportedLatency)
-    {
-        lastReportedLatency = latency;
-        setLatencySamples(latency);
-    }
 }
 
 void SlowTimeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
@@ -228,8 +220,6 @@ void SlowTimeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     lastBlocBEnabled = blocBEnabled;
     lastLoopDivision = loopDivision;
 
-    updateLatencyReport(blocAEnabled);
-
     const float pitchSemitones = apvts.getRawParameterValue(ParamIDs::pitchSemitones)->load();
     const float fineCents      = apvts.getRawParameterValue(ParamIDs::fineCents)->load();
     const float sourceFreqHz   = apvts.getRawParameterValue(ParamIDs::sourceFreqHz)->load();
@@ -254,6 +244,29 @@ void SlowTimeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
         stretchEngine.setPitchSemitones(appliedSemitones, appliedTonalityLimitHz);
         stretchEngine.process(buffer, numSamples);
     }
+    else
+    {
+        // PITCH off: the reported latency is constant (Bloc A's), so the signal
+        // must still come out delayed by that amount -- otherwise it would land
+        // ahead of the grid once the host compensates. Replace the buffer with
+        // the raw input read back by cachedBlocALatencySamples from the dry ring
+        // (same source and formula as the aligned-dry read further below). Bloc
+        // B/C then chop this delayed audio against the latency-shifted grid, and
+        // host PDC lands the result on the beat -- identically to the PITCH-on
+        // path, just without the phase-vocoder colouring. No new buffer needed:
+        // dryDelayRing is already sized for cachedBlocALatencySamples + a block.
+        const juce::int64 blockStart = dryDelayWriteHead - numSamples;
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+        {
+            const int ringCh = juce::jmin(ch, dryDelayRing.getNumChannels() - 1);
+            for (int i = 0; i < numSamples; ++i)
+            {
+                const juce::int64 readAbs = blockStart + i - cachedBlocALatencySamples;
+                const auto idx = static_cast<int>(((readAbs % dryDelaySize) + dryDelaySize) % dryDelaySize);
+                buffer.setSample(ch, i, dryDelayRing.getSample(ringCh, idx));
+            }
+        }
+    }
 
     // Keep the rolling history buffer warm whenever the host transport is
     // actually running (or when the host gives no transport info at all,
@@ -263,8 +276,9 @@ void SlowTimeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     // of pure silence right as playback resumed.
     const bool transportActive = ! hostSync.hasPosition || hostSync.isPlaying;
 
-    // Bloc B chops Bloc A's OUTPUT, which is delayed by Bloc A's phase-vocoder
-    // latency, yet the host reports the playhead in real time. Left uncorrected,
+    // Bloc B chops audio that is delayed by Bloc A's phase-vocoder latency (the
+    // wet path when PITCH is on, a plain delay of the same length when it's
+    // off), yet the host reports the playhead in real time. Left uncorrected,
     // Bloc B would place its reset grid against real-time PPQ while the audio it
     // is actually cutting is that many samples behind -- so the whole chop grid
     // sits off the beat (worst at a play/seek, where Bloc A's warm-up feeds a
@@ -272,11 +286,14 @@ void SlowTimeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     // tempo). Shifting the PPQ that Bloc B uses for boundary detection back by
     // Bloc A's latency makes it cut the delayed audio at its true musical
     // position; host PDC (which compensates that same latency) then lands the
-    // result on the grid. Zero when Bloc A is off. Only boundary detection is
-    // shifted -- transport-jump detection stays on the raw playhead. Bloc C
+    // result on the grid. Always applied now (latency is constant). Only
+    // boundary detection is shifted -- transport-jump detection stays on the raw playhead. Bloc C
     // (reverse) sits downstream of the same latency, so it shares this grid.
+    // The plugin always runs delayed by Bloc A's latency now (wet path when
+    // PITCH is on, a plain delay when it's off), so the grid shift is always
+    // applied -- not just when PITCH is engaged.
     HostSyncInfo gridSync = hostSync;
-    if (blocAEnabled && hostSync.hasPpq && hostSync.bpm > 0.0)
+    if (hostSync.hasPpq && hostSync.bpm > 0.0)
     {
         const double blocALatencyQn = (static_cast<double>(cachedBlocALatencySamples) / currentSampleRate)
                                       * (hostSync.bpm / 60.0);
@@ -564,7 +581,10 @@ void SlowTimeAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce
     }
 
     // --- Aligned dry: read the dry path back by the wet path's latency ---
-    const int dryDelaySamples = blocAEnabled ? cachedBlocALatencySamples : 0;
+    // Always the full latency now -- the processed path is delayed by Bloc A's
+    // latency whether or not PITCH is engaged (see the pitch section above), so
+    // the dry the Fade/Mix blends against has to be delayed by the same amount.
+    const int dryDelaySamples = cachedBlocALatencySamples;
     const juce::int64 dryBlockStart = dryDelayWriteHead - numSamples;
     dryBuffer.setSize(buffer.getNumChannels(), numSamples, false, false, true);
     for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
